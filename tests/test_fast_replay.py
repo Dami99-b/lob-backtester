@@ -1,12 +1,10 @@
 import numpy as np
-from conftest import todo
 
 from lobtest.book import OrderBook
 from lobtest.replay_fast import replay_top_of_book
 from lobtest.synthetic import generate
 
 
-@todo
 def test_fast_replay_matches_reference():
     msgs = generate(20_000, seed=3)
     fast = replay_top_of_book(msgs)

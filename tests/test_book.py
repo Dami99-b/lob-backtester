@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-from conftest import todo
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -15,7 +14,6 @@ def msg(t, kind, side, oid, price, qty):
     return np.array([(t, kind, side, oid, price, qty)], dtype=MESSAGE_DTYPE)[0]
 
 
-@todo
 def test_add_sets_top_of_book():
     b = OrderBook()
     b.apply(msg(1, ADD, BID, 1, 99, 100))
@@ -25,7 +23,6 @@ def test_add_sets_top_of_book():
     assert b.best_ask() == (101, 70)
 
 
-@todo
 def test_partial_and_full_cancel():
     b = OrderBook()
     b.apply(msg(1, ADD, BID, 1, 99, 100))
@@ -36,7 +33,6 @@ def test_partial_and_full_cancel():
     assert b.best_bid() == (98, 100)
 
 
-@todo
 def test_execute_removes_liquidity_and_empty_side_is_none():
     b = OrderBook()
     b.apply(msg(1, ADD, ASK, 1, 101, 100))
@@ -44,7 +40,6 @@ def test_execute_removes_liquidity_and_empty_side_is_none():
     assert b.best_ask() is None
 
 
-@todo
 def test_depth_is_sorted_best_first():
     b = OrderBook()
     for i, p in enumerate([97, 99, 98]):
@@ -52,7 +47,6 @@ def test_depth_is_sorted_best_first():
     assert b.depth(BID, 2) == [(99, 10), (98, 10)]
 
 
-@todo
 def test_bad_messages_raise():
     b = OrderBook()
     with pytest.raises(ValueError):
@@ -62,7 +56,6 @@ def test_bad_messages_raise():
         b.apply(msg(3, CANCEL, BID, 1, 99, 11))
 
 
-@todo
 @settings(max_examples=25, deadline=None)
 @given(seed=st.integers(0, 10_000), n=st.integers(1, 3_000))
 def test_total_quantity_matches_live_orders(seed, n):

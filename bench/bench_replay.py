@@ -16,8 +16,10 @@ from pathlib import Path
 
 import numpy as np
 
+from lobtest.backtest.engine import Config, run
 from lobtest.book import replay
 from lobtest.replay_fast import replay_top_of_book
+from lobtest.strategies.market_maker import MarketMaker
 from lobtest.synthetic import generate
 
 
@@ -39,11 +41,19 @@ def main() -> None:
         "python": platform.python_version(),
         "when": datetime.now(UTC).isoformat(),
     }
-    for name, fn in [("python_book", replay), ("numba_core", replay_top_of_book)]:
+
+    def backtest(m):
+        return run(m, MarketMaker(), Config(sample_every_ns=1_000_000))
+
+    for name, fn in [
+        ("python_book", replay),
+        ("numba_core", replay_top_of_book),
+        ("backtest", backtest),
+    ]:
         try:
             if name == "numba_core":
                 fn(msgs[:1_000])  # JIT warm-up, not timed
-            secs = timed(fn, msgs)
+            secs = timed(fn, msgs, repeats=3 if name == "backtest" else 5)
             results[name] = {"seconds": secs, "msgs_per_s": n / secs}
             print(f"{name:12s} {n / secs:>14,.0f} msgs/s")
         except NotImplementedError:
