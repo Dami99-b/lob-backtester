@@ -1,44 +1,116 @@
-"""Limit order book rebuilt from L3 messages.
+"""Limit order book rebuilt from L3 (market-by-order) messages.
 
-YOUR CORE CODE. Interviewers will ask about every choice here, so write it
-yourself. Spec (the tests in tests/test_book.py check all of it):
+Design (see docs/DESIGN.md for the reasoning and interview questions):
 
-- apply(msg) handles ADD, CANCEL (partial or full) and EXECUTE (partial or full).
-- best_bid() / best_ask() return (price, total_qty) or None when that side is empty.
-- depth(side, levels) returns the top `levels` price levels as [(price, qty), ...],
-  best first.
-- Unknown order ids or over-sized cancels raise ValueError.
+- ``_orders``: order_id -> [side, price, remaining_qty]. Every CANCEL/EXECUTE
+  names an order id, so an O(1) hash lookup is the natural index.
+- ``_levels[side]``: price -> total resting quantity at that price. The book is
+  aggregated per level because that is what best bid/ask and depth report.
+- ``_heaps[side]``: a heap of prices for O(log n) best-price access. Bids are
+  stored negated so both sides use Python's min-heap. Prices whose level has
+  emptied are left in the heap and skipped lazily when they reach the top
+  ("lazy deletion"); this keeps every removal O(1) instead of O(n).
 
-Start with dicts (order_id -> order, price -> level qty) plus sorted price lists,
-measure it with bench/bench_replay.py, then optimise. Record each version's
-numbers in docs/PERFORMANCE.md: the before/after story is what makes the CV line.
+This pure-Python version is the readable reference. ``replay_fast.py`` is the
+Numba version, and a test checks the two agree after every message.
 """
 
 from __future__ import annotations
 
+import heapq
+
 import numpy as np
+
+from lobtest.events import ADD, ASK, BID, CANCEL, EXECUTE
 
 
 class OrderBook:
     def __init__(self) -> None:
-        # TODO: choose your data structures.
-        pass
+        self._orders: dict[int, list[int]] = {}
+        self._levels: tuple[dict[int, int], dict[int, int]] = ({}, {})
+        # BID heap holds -price (so the smallest entry is the highest bid);
+        # ASK heap holds +price (smallest entry is the lowest ask).
+        self._heaps: tuple[list[int], list[int]] = ([], [])
 
+    # ------------------------------------------------------------------ updates
     def apply(self, msg: np.void) -> None:
-        raise NotImplementedError("TODO: implement OrderBook.apply")
+        kind = int(msg["type"])
+        order_id = int(msg["order_id"])
+        qty = int(msg["qty"])
+        if qty <= 0:
+            raise ValueError(f"non-positive quantity {qty} for order {order_id}")
+        if kind == ADD:
+            self._add(order_id, int(msg["side"]), int(msg["price"]), qty)
+        elif kind in (CANCEL, EXECUTE):
+            # For the book, a cancel and an execution do the same thing: they
+            # remove resting quantity. The difference matters to the backtest
+            # engine (executions can fill our queued orders), not here.
+            self._reduce(order_id, qty)
+        else:
+            raise ValueError(f"unknown message type {kind}")
+
+    def _add(self, order_id: int, side: int, price: int, qty: int) -> None:
+        if order_id in self._orders:
+            raise ValueError(f"duplicate order id {order_id}")
+        if side not in (BID, ASK):
+            raise ValueError(f"unknown side {side}")
+        self._orders[order_id] = [side, price, qty]
+        level = self._levels[side]
+        if price not in level:
+            # Only push when a level is (re)created, so the heap holds at most
+            # one live entry per price plus stale ones awaiting lazy removal.
+            heapq.heappush(self._heaps[side], -price if side == BID else price)
+            level[price] = 0
+        level[price] += qty
+
+    def _reduce(self, order_id: int, qty: int) -> None:
+        order = self._orders.get(order_id)
+        if order is None:
+            raise ValueError(f"unknown order id {order_id}")
+        side, price, remaining = order
+        if qty > remaining:
+            raise ValueError(f"cannot remove {qty} from order {order_id} with {remaining} left")
+        level = self._levels[side]
+        level[price] -= qty
+        if level[price] == 0:
+            del level[price]  # heap entry becomes stale; cleaned up in _best
+        if qty == remaining:
+            del self._orders[order_id]
+        else:
+            order[2] = remaining - qty
+
+    # ------------------------------------------------------------------ queries
+    def _best(self, side: int) -> tuple[int, int] | None:
+        heap, level = self._heaps[side], self._levels[side]
+        while heap:
+            price = -heap[0] if side == BID else heap[0]
+            if price in level:
+                return price, level[price]
+            heapq.heappop(heap)  # lazy deletion of an emptied level
+        return None
 
     def best_bid(self) -> tuple[int, int] | None:
-        raise NotImplementedError("TODO: implement OrderBook.best_bid")
+        return self._best(BID)
 
     def best_ask(self) -> tuple[int, int] | None:
-        raise NotImplementedError("TODO: implement OrderBook.best_ask")
+        return self._best(ASK)
 
     def depth(self, side: int, levels: int) -> list[tuple[int, int]]:
-        raise NotImplementedError("TODO: implement OrderBook.depth")
+        # Sorting all levels is O(L log L); fine for snapshots, which are rare
+        # next to updates. A hot-path depth feed would keep levels sorted.
+        prices = sorted(self._levels[side], reverse=(side == BID))[:levels]
+        return [(p, self._levels[side][p]) for p in prices]
+
+    def level_qty(self, side: int, price: int) -> int:
+        """Total resting quantity at one price (0 if the level is empty)."""
+        return self._levels[side].get(price, 0)
+
+    def __len__(self) -> int:
+        return len(self._orders)
 
 
 def replay(messages: np.ndarray, book: OrderBook | None = None) -> OrderBook:
-    """Pure-Python replay. This is the baseline your Numba version must beat."""
+    """Pure-Python replay: the reference the Numba core is checked against."""
     book = book or OrderBook()
     for msg in messages:
         book.apply(msg)
