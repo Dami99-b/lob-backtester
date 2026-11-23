@@ -1,0 +1,24 @@
+[project]
+name = "lobtest"
+version = "0.1.0"
+description = "Event-driven backtesting on real limit-order-book data, with a Numba replay core"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "numba>=0.59", "pandas>=2.2", "pyarrow>=15"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "hypothesis>=6.100", "ruff>=0.6", "pytest-benchmark>=4"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
