@@ -37,7 +37,7 @@ def _replay(kinds, sides, slots, prices, qtys, n_slots, n_prices):  # pragma: no
     order_side = np.zeros(n_slots, dtype=np.int8)
     order_price = np.zeros(n_slots, dtype=np.int64)
     order_qty = np.zeros(n_slots, dtype=np.int64)
-    best_bid = -1  # index into the price arrays, -1 = side empty
+    best_bid = -1
     best_ask = -1
 
     for i in range(n):
@@ -56,13 +56,12 @@ def _replay(kinds, sides, slots, prices, qtys, n_slots, n_prices):  # pragma: no
                 ask_qty[p] += q
                 if best_ask == -1 or p < best_ask:
                     best_ask = p
-        else:  # CANCEL or EXECUTE: remove resting quantity
+        else:
             p = order_price[slot]
             order_qty[slot] -= q
             if order_side[slot] == BID:
                 bid_qty[p] -= q
                 if p == best_bid and bid_qty[p] == 0:
-                    # Walk down to the next non-empty bid level.
                     j = p - 1
                     while j >= 0 and bid_qty[j] == 0:
                         j -= 1
@@ -111,7 +110,6 @@ def replay_top_of_book(messages: np.ndarray) -> np.ndarray:
         int(slots.max()) + 1,
         n_prices,
     )
-    # Translate price indices back to absolute ticks.
     for col in (0, 2):
         mask = out[:, col] != EMPTY
         out[mask, col] += min_price

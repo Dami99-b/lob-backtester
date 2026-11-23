@@ -29,11 +29,11 @@ class MarketMaker:
 
     def on_book(self, ts_ns: int, best_bid: int, best_ask: int, position: int) -> list[Quote]:
         if best_bid < 0 or best_ask < 0:
-            return []  # no two-sided market to price off
+            return []
         skew = round(self.skew_per_unit * position)
-        bid = best_bid - max(skew, 0)  # long: back off the bid
-        ask = best_ask - min(skew, 0)  # short: back off the ask
-        if ask <= bid:  # never quote a crossed market against ourselves
+        bid = best_bid - max(skew, 0)
+        ask = best_ask - min(skew, 0)
+        if ask <= bid:
             return []
         quotes = []
         if position + self.size <= self.max_position:

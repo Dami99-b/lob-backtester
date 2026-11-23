@@ -8,23 +8,21 @@ from __future__ import annotations
 
 import numpy as np
 
-# Message types
-ADD = 0  # new resting order
-CANCEL = 1  # remove (part of) a resting order
-EXECUTE = 2  # resting order traded against an incoming aggressor
+ADD = 0
+CANCEL = 1
+EXECUTE = 2
 
-# Sides
 BID = 0
 ASK = 1
 
 MESSAGE_DTYPE = np.dtype(
     [
-        ("ts_ns", np.int64),  # exchange timestamp, nanoseconds
-        ("type", np.int8),  # ADD / CANCEL / EXECUTE
-        ("side", np.int8),  # BID / ASK
+        ("ts_ns", np.int64),
+        ("type", np.int8),
+        ("side", np.int8),
         ("order_id", np.int64),
-        ("price", np.int64),  # integer ticks
-        ("qty", np.int64),  # shares / lots
+        ("price", np.int64),
+        ("qty", np.int64),
     ]
 )
 

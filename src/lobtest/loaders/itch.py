@@ -41,12 +41,12 @@ import numpy as np
 
 from lobtest.events import ADD, ASK, BID, CANCEL, EXECUTE, MESSAGE_DTYPE
 
-_HEADER = struct.Struct(">cHH6s")  # type, stock locate, tracking number, timestamp
-_ADD = struct.Struct(">QcI8sI")  # order ref, side, shares, stock, price
-_EXEC = struct.Struct(">QIQ")  # order ref, executed shares, match number
-_CANCEL = struct.Struct(">QI")  # order ref, cancelled shares
-_DELETE = struct.Struct(">Q")  # order ref
-_REPLACE = struct.Struct(">QQII")  # original ref, new ref, shares, price
+_HEADER = struct.Struct(">cHH6s")
+_ADD = struct.Struct(">QcI8sI")
+_EXEC = struct.Struct(">QIQ")
+_CANCEL = struct.Struct(">QI")
+_DELETE = struct.Struct(">Q")
+_REPLACE = struct.Struct(">QQII")
 
 
 def _timestamp(raw: bytes) -> int:
@@ -75,7 +75,7 @@ def iter_messages(stream: BinaryIO) -> Iterator[bytes]:
 def parse(stream: BinaryIO, symbol: str, tick: int = 100) -> np.ndarray:
     """Translate the ITCH messages for ``symbol`` into a lobtest message array."""
     stock = symbol.encode().ljust(8)
-    live: dict[int, list[int]] = {}  # order ref -> [side, price_ticks, remaining]
+    live: dict[int, list[int]] = {}
     rows: list[tuple[int, int, int, int, int, int]] = []
     for msg in iter_messages(stream):
         kind = msg[:1]
@@ -95,7 +95,7 @@ def parse(stream: BinaryIO, symbol: str, tick: int = 100) -> np.ndarray:
         ref = struct.unpack_from(">Q", msg, 11)[0]
         order = live.get(ref)
         if order is None:
-            continue  # an order for another stock
+            continue
         side, p, remaining = order
         if kind in (b"E", b"C"):
             _, shares, _ = _EXEC.unpack_from(msg, 11)
@@ -108,7 +108,7 @@ def parse(stream: BinaryIO, symbol: str, tick: int = 100) -> np.ndarray:
         elif kind == b"D":
             rows.append((ts, CANCEL, side, ref, p, remaining))
             remaining = 0
-        else:  # U: replace = cancel old + add new (loses queue priority, as on NASDAQ)
+        else:
             _, new_ref, shares, price = _REPLACE.unpack_from(msg, 11)
             rows.append((ts, CANCEL, side, ref, p, remaining))
             remaining = 0

@@ -50,7 +50,6 @@ def system_event(ts):
 
 
 def test_message_lengths_match_the_spec():
-    # A=36, F=40, E=31, C=36, X=23, D=19, U=35 bytes (excluding the 2-byte length)
     assert len(add(0, 1, b"B", 1, b"AAPL", 1)) - 2 == 36
     assert len(add(0, 1, b"B", 1, b"AAPL", 1, mpid=True)) - 2 == 40
     assert len(executed(0, 1, 1)) - 2 == 31
@@ -64,13 +63,13 @@ def test_parse_translates_every_message_type_for_one_stock():
     data = b"".join(
         [
             system_event(1),
-            add(10, 1, b"B", 500, b"AAPL", 1_500_000),  # $150.00 -> 15000 ticks
+            add(10, 1, b"B", 500, b"AAPL", 1_500_000),
             add(11, 2, b"S", 300, b"AAPL", 1_500_100, mpid=True),
-            add(12, 3, b"B", 999, b"MSFT", 4_000_000),  # other stock: ignored
+            add(12, 3, b"B", 999, b"MSFT", 4_000_000),
             executed(20, 1, 100),
             executed_px(21, 2, 50, 1_500_200),
             cancel(22, 1, 150),
-            executed(23, 3, 10),  # MSFT: ignored
+            executed(23, 3, 10),
             replace(30, 2, 4, 400, 1_500_000 + 300),
             delete(40, 1),
         ]
@@ -80,11 +79,11 @@ def test_parse_translates_every_message_type_for_one_stock():
         (10, ADD, BID, 1, 15000, 500),
         (11, ADD, ASK, 2, 15001, 300),
         (20, EXECUTE, BID, 1, 15000, 100),
-        (21, EXECUTE, ASK, 2, 15001, 50),  # at the resting price, not the print price
+        (21, EXECUTE, ASK, 2, 15001, 50),
         (22, CANCEL, BID, 1, 15000, 150),
-        (30, CANCEL, ASK, 2, 15001, 250),  # replace removes what was left of order 2
+        (30, CANCEL, ASK, 2, 15001, 250),
         (30, ADD, ASK, 4, 15003, 400),
-        (40, CANCEL, BID, 1, 15000, 250),  # delete removes the remaining 250
+        (40, CANCEL, BID, 1, 15000, 250),
     ]
     assert [tuple(int(x) for x in row) for row in m] == expected
     book = replay(m)

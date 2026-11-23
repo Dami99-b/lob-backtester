@@ -25,7 +25,7 @@ def stream(rows):
 
 
 BASE = [
-    (1, ADD, BID, 1, 100, 300),  # 300 ahead of us at 100
+    (1, ADD, BID, 1, 100, 300),
     (2, ADD, ASK, 2, 101, 300),
 ]
 CFG = Config(latency_ns=10, maker_fee_bps=0.0, tick_size=1.0, sample_every_ns=1)
@@ -34,10 +34,10 @@ CFG = Config(latency_ns=10, maker_fee_bps=0.0, tick_size=1.0, sample_every_ns=1)
 def test_queue_position_executions_must_clear_volume_ahead_first():
     msgs = stream(BASE + [(20, EXECUTE, BID, 1, 100, 200), (30, EXECUTE, BID, 1, 100, 100)])
     res = run(msgs, FixedBid(100), CFG)
-    assert res.fills == 0  # 300 ahead, only 300 traded: we are now first in line
+    assert res.fills == 0
     msgs = stream(BASE + [(20, ADD, BID, 3, 100, 100), (30, EXECUTE, BID, 1, 100, 300)])
     res = run(msgs, FixedBid(100), CFG)
-    assert res.fills == 0  # order 3 joined *behind* us, but 300 were still ahead
+    assert res.fills == 0
 
 
 def test_excess_execution_fills_us():
@@ -50,7 +50,7 @@ def test_excess_execution_fills_us():
         ]
     )
     res = run(msgs, FixedBid(100), CFG)
-    assert res.volume == 60  # first 300 cleared the queue; the next 60 hit us
+    assert res.volume == 60
     assert res.position[-1] == 60
 
 
@@ -59,17 +59,15 @@ def test_latency_order_cannot_fill_before_it_arrives():
         BASE
         + [(5, EXECUTE, BID, 1, 100, 300), (6, ADD, BID, 3, 99, 50), (7, EXECUTE, BID, 3, 99, 50)]
     )
-    res = run(msgs, FixedBid(100), CFG)  # decided at t=1, live only from t=11
+    res = run(msgs, FixedBid(100), CFG)
     assert res.fills == 0
 
 
 def test_trade_through_fills_resting_order():
-    # We improve the market with a bid at 100.5 -> use integer ticks: bid 100 above 99.
     msgs = stream(
         [(1, ADD, BID, 1, 99, 300), (2, ADD, ASK, 2, 101, 300), (30, EXECUTE, BID, 1, 99, 80)]
     )
     res = run(msgs, FixedBid(100), CFG)
-    # a sell printed at 99 while our bid at 100 was live: it would have hit us first
     assert res.volume == 80
 
 
@@ -84,8 +82,6 @@ def test_cancel_shrinks_queue_ahead_only_when_level_drops_below_it():
         ]
     )
     res = run(msgs, FixedBid(100), CFG)
-    # after the cancel the level holds 50, so ahead = 50; the 50 traded clears it;
-    # order 3 joined behind us, so its execution of 30 fills us.
     assert res.volume == 30
 
 

@@ -15,7 +15,7 @@ from lobtest.events import ADD, ASK, BID, CANCEL, EXECUTE, MESSAGE_DTYPE
 def generate(n: int, seed: int = 0, mid: int = 10_000, spread: int = 2) -> np.ndarray:
     rng = np.random.default_rng(seed)
     out = np.empty(n, dtype=MESSAGE_DTYPE)
-    live: dict[int, list[int]] = {}  # order_id -> [side, price, qty]
+    live: dict[int, list[int]] = {}
     live_ids: list[int] = []
     next_id = 1
     ts = 0

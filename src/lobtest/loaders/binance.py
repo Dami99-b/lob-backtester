@@ -18,10 +18,9 @@ COLUMNS = ["trade_id", "price", "qty", "quote_qty", "time", "is_buyer_maker", "i
 
 def load_trades_csv(path: str | Path, tick_size: float = 0.01) -> pd.DataFrame:
     df = pd.read_csv(path, header=None, names=COLUMNS)
-    if not df.empty and not str(df.iloc[0]["trade_id"]).isdigit():  # some files include a header
+    if not df.empty and not str(df.iloc[0]["trade_id"]).isdigit():
         df = df.iloc[1:]
     df = df.astype({"trade_id": "int64", "price": "float64", "qty": "float64", "time": "int64"})
-    # Binance switched from milliseconds to microseconds in 2025; normalise to ns.
     unit = 1_000 if df["time"].max() > 10**15 else 1_000_000
     return pd.DataFrame(
         {

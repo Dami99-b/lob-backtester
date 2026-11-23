@@ -52,7 +52,7 @@ def main() -> None:
     ]:
         try:
             if name == "numba_core":
-                fn(msgs[:1_000])  # JIT warm-up, not timed
+                fn(msgs[:1_000])
             secs = timed(fn, msgs, repeats=3 if name == "backtest" else 5)
             results[name] = {"seconds": secs, "msgs_per_s": n / secs}
             print(f"{name:12s} {n / secs:>14,.0f} msgs/s")

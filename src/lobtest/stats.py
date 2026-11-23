@@ -84,8 +84,6 @@ def deflated_sharpe(sr: float, n_trials: int, n_obs: int, skew: float, kurt: flo
     if n_trials == 1:
         benchmark = 0.0
     else:
-        # Expected maximum of n_trials standard normals, scaled by the estimator's
-        # standard error: the Sharpe the luckiest noise strategy would show.
         expected_max_z = (1 - _EULER_GAMMA) * _N.inv_cdf(1 - 1 / n_trials) + _EULER_GAMMA * (
             _N.inv_cdf(1 - 1 / (n_trials * math.e))
         )

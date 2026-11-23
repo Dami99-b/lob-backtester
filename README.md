@@ -14,7 +14,6 @@ confidence intervals and the Deflated Sharpe Ratio.
 | Backtest engine | ~150K msgs/s |
 | ITCH 5.0 parser | ~460K msgs/s |
 
-Design decisions and their trade-offs: [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Layout
 

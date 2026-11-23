@@ -1,6 +1,6 @@
 """Limit order book rebuilt from L3 (market-by-order) messages.
 
-Design (see docs/DESIGN.md for the reasoning and interview questions):
+Design:
 
 - ``_orders``: order_id -> [side, price, remaining_qty]. Every CANCEL/EXECUTE
   names an order id, so an O(1) hash lookup is the natural index.
@@ -28,11 +28,8 @@ class OrderBook:
     def __init__(self) -> None:
         self._orders: dict[int, list[int]] = {}
         self._levels: tuple[dict[int, int], dict[int, int]] = ({}, {})
-        # BID heap holds -price (so the smallest entry is the highest bid);
-        # ASK heap holds +price (smallest entry is the lowest ask).
         self._heaps: tuple[list[int], list[int]] = ([], [])
 
-    # ------------------------------------------------------------------ updates
     def apply(self, msg: np.void) -> None:
         kind = int(msg["type"])
         order_id = int(msg["order_id"])
@@ -42,9 +39,6 @@ class OrderBook:
         if kind == ADD:
             self._add(order_id, int(msg["side"]), int(msg["price"]), qty)
         elif kind in (CANCEL, EXECUTE):
-            # For the book, a cancel and an execution do the same thing: they
-            # remove resting quantity. The difference matters to the backtest
-            # engine (executions can fill our queued orders), not here.
             self._reduce(order_id, qty)
         else:
             raise ValueError(f"unknown message type {kind}")
@@ -57,8 +51,6 @@ class OrderBook:
         self._orders[order_id] = [side, price, qty]
         level = self._levels[side]
         if price not in level:
-            # Only push when a level is (re)created, so the heap holds at most
-            # one live entry per price plus stale ones awaiting lazy removal.
             heapq.heappush(self._heaps[side], -price if side == BID else price)
             level[price] = 0
         level[price] += qty
@@ -73,20 +65,19 @@ class OrderBook:
         level = self._levels[side]
         level[price] -= qty
         if level[price] == 0:
-            del level[price]  # heap entry becomes stale; cleaned up in _best
+            del level[price]
         if qty == remaining:
             del self._orders[order_id]
         else:
             order[2] = remaining - qty
 
-    # ------------------------------------------------------------------ queries
     def _best(self, side: int) -> tuple[int, int] | None:
         heap, level = self._heaps[side], self._levels[side]
         while heap:
             price = -heap[0] if side == BID else heap[0]
             if price in level:
                 return price, level[price]
-            heapq.heappop(heap)  # lazy deletion of an emptied level
+            heapq.heappop(heap)
         return None
 
     def best_bid(self) -> tuple[int, int] | None:
@@ -96,8 +87,6 @@ class OrderBook:
         return self._best(ASK)
 
     def depth(self, side: int, levels: int) -> list[tuple[int, int]]:
-        # Sorting all levels is O(L log L); fine for snapshots, which are rare
-        # next to updates. A hot-path depth feed would keep levels sorted.
         prices = sorted(self._levels[side], reverse=(side == BID))[:levels]
         return [(p, self._levels[side][p]) for p in prices]
 

@@ -44,16 +44,16 @@ from lobtest.strategies.base import Quote
 
 @dataclass
 class Config:
-    latency_ns: int = 1_000_000  # 1 ms each way between decision and exchange
-    maker_fee_bps: float = 1.0  # fee on each passive fill, in basis points of notional
-    tick_size: float = 0.01  # currency per price tick
-    sample_every_ns: int = 1_000_000_000  # mark-to-market sampling interval (1 s)
+    latency_ns: int = 1_000_000
+    maker_fee_bps: float = 1.0
+    tick_size: float = 0.01
+    sample_every_ns: int = 1_000_000_000
 
 
 @dataclass
 class Result:
     ts_ns: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
-    pnl: np.ndarray = field(default_factory=lambda: np.zeros(0))  # mark-to-market, after fees
+    pnl: np.ndarray = field(default_factory=lambda: np.zeros(0))
     position: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
     fills: int = 0
     volume: int = 0
@@ -64,7 +64,7 @@ class Result:
 class _Resting:
     price: int
     qty: int
-    ahead: int  # resting volume in front of us at this price
+    ahead: int
 
 
 def run(
@@ -77,9 +77,8 @@ def run(
     """
     cfg = config or Config()
     book = copy.deepcopy(book) if book is not None else OrderBook()
-    resting: dict[int, _Resting] = {}  # side -> our live order at the exchange
-    intended: dict[int, tuple[int, int] | None] = {BID: None, ASK: None}  # side -> (price, qty)
-    # Pending exchange actions: (arrival_ts, seq, side, price, qty); qty 0 = cancel.
+    resting: dict[int, _Resting] = {}
+    intended: dict[int, tuple[int, int] | None] = {BID: None, ASK: None}
     pending: list[tuple[int, int, int, int, int]] = []
     seq = 0
 
@@ -96,7 +95,7 @@ def run(
         nonlocal position, cash, fees, fills, volume
         notional = price * cfg.tick_size * qty
         fee = notional * cfg.maker_fee_bps / 10_000
-        if side == BID:  # our bid was hit: we bought
+        if side == BID:
             position += qty
             cash -= notional
         else:
@@ -111,7 +110,6 @@ def run(
     for msg in messages:
         t = int(msg["ts_ns"])
 
-        # 1. Deliver our orders/cancels whose latency has elapsed.
         while pending and pending[0][0] <= t:
             _, _, side, price, qty = heapq.heappop(pending)
             if qty == 0:
@@ -119,7 +117,6 @@ def run(
             else:
                 resting[side] = _Resting(price, qty, book.level_qty(side, price))
 
-        # 2. Match the market message against our resting orders, then apply it.
         kind, side, price, qty = (
             int(msg["type"]),
             int(msg["side"]),
@@ -143,12 +140,11 @@ def run(
                 ours.qty -= filled
                 if ours.qty == 0:
                     del resting[side]
-                    intended[side] = None  # strategy may re-quote
+                    intended[side] = None
         book.apply(msg)
         for s, order in resting.items():
             order.ahead = min(order.ahead, book.level_qty(s, order.price))
 
-        # 3. Let the strategy react to the new top of book.
         bb, ba = book.best_bid(), book.best_ask()
         best_bid = bb[0] if bb else -1
         best_ask = ba[0] if ba else -1
@@ -160,7 +156,7 @@ def run(
                 q: Quote | None = wanted.get(s)
                 target = (q.price, q.qty) if q else None
                 if target == intended[s]:
-                    continue  # unchanged quote keeps its queue position
+                    continue
                 intended[s] = target
                 seq += 1
                 if target is None:
@@ -168,7 +164,6 @@ def run(
                 else:
                     heapq.heappush(pending, (t + cfg.latency_ns, seq, s, target[0], target[1]))
 
-        # 4. Mark to market on a fixed clock.
         if t >= next_sample and best_bid >= 0 and best_ask >= 0:
             mid = (best_bid + best_ask) / 2 * cfg.tick_size
             samples_ts.append(t)

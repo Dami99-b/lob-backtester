@@ -15,8 +15,8 @@ from typing import Protocol
 
 @dataclass(frozen=True)
 class Quote:
-    side: int  # events.BID / events.ASK
-    price: int  # ticks
+    side: int
+    price: int
     qty: int
 
 

@@ -31,19 +31,17 @@ GRID = {"size": [100, 200], "skew_ticks_at_max": [0, 1, 2, 4]}
 
 def _returns(messages: np.ndarray, params: dict, cfg: Config, book: OrderBook) -> np.ndarray:
     res = run(messages, MarketMaker(max_position=1_000, **params), cfg, book)
-    return np.diff(res.pnl)  # PnL change per sampling interval
+    return np.diff(res.pnl)
 
 
 def walk_forward(messages: np.ndarray, n_folds: int = 5, cfg: Config | None = None) -> dict:
     cfg = cfg or Config()
     folds = np.array_split(messages, n_folds)
-    # Book state at the start of each fold: later folds cancel orders that were
-    # placed earlier in the day, so every fold must start from a real snapshot.
     snapshots = [OrderBook()]
     for fold in folds[:-1]:
         snapshots.append(replay(fold, copy.deepcopy(snapshots[-1])))
     grid = [dict(zip(GRID, values, strict=True)) for values in itertools.product(*GRID.values())]
-    periods_per_year = 252 * 6.5 * 3600 * 1e9 / cfg.sample_every_ns  # trading-time samples
+    periods_per_year = 252 * 6.5 * 3600 * 1e9 / cfg.sample_every_ns
     oos: list[np.ndarray] = []
     chosen = []
     for k in range(1, n_folds):
@@ -72,9 +70,8 @@ def main(argv: list[str]) -> None:
     n = int(argv[1]) if len(argv) > 1 else 1_000_000
     n_folds = int(argv[2]) if len(argv) > 2 else 5
     if len(argv) > 3:
-        messages, cfg = np.load(argv[3]), Config()  # real data: sample PnL every second
+        messages, cfg = np.load(argv[3]), Config()
     else:
-        # The synthetic stream spans only seconds of market time, so sample every ms.
         messages, cfg = generate(n, seed=11), Config(sample_every_ns=1_000_000)
     print(json.dumps(walk_forward(messages, n_folds, cfg), indent=2))
 
